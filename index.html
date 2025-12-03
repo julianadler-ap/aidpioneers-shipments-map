@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Aid Pioneers Shipments Map</title>
+  <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+
+  <!-- Mapbox GL CSS -->
+  <link
+    href="https://api.mapbox.com/mapbox-gl-js/v2.16.1/mapbox-gl.css"
+    rel="stylesheet"
+  />
+
+  <style>
+    body { margin: 0; padding: 0; }
+    #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <!-- Mapbox GL JS -->
+  <script src="https://api.mapbox.com/mapbox-gl-js/v2.16.1/mapbox-gl.js"></script>
+  <script>
+    // 1. Dein Mapbox Token hier eintragen
+    mapboxgl.accessToken = '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';
+
+    // 2. GeoJSON von GitHub
+    const DATA_URL =
+      'https://raw.githubusercontent.com/julianadler-ap/aidpioneers-shipments-map/main/combined.geojson';
+
+    // 3. Karte initialisieren
+    const map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox/streets-v11', // oder eigener Style
+      center: [10, 20],
+      zoom: 2
+    });
+
+    map.on('load', async () => {
+      const response = await fetch(DATA_URL);
+      const geojson = await response.json();
+
+      // Nur POINT-Zeilen nutzen
+      const pointFeatures = geojson.features.filter(f =>
+        f.properties['Row Type'] === 'POINT'
+      );
+
+      const points = {
+        type: 'FeatureCollection',
+        features: pointFeatures
+      };
+
+      // 4. Quelle + Punkt-Layer
+      map.addSource('shipments', {
+        type: 'geojson',
+        data: points
+      });
+
+      map.addLayer({
+        id: 'shipment-points',
+        type: 'circle',
+        source: 'shipments',
+        paint: {
+          'circle-radius': 4,
+          'circle-color': '#ff5722',
+          'circle-stroke-width': 1,
+          'circle-stroke-color': '#ffffff'
+        }
+      });
+
+      // 5. Popup bei Klick
+      map.on('click', 'shipment-points', (e) => {
+        const f = e.features[0];
+        const p = f.properties;
+
+        const html = `
+          <strong>${p['Container Number'] || ''}</strong><br/>
+          Project: ${p['Project Code'] || ''}<br/>
+          Partner: ${p['Local Partner'] || ''}<br/>
+          Location: ${p['Location Name'] || ''}<br/>
+          Date: ${p['DateTime'] || ''}
+        `;
+
+        new mapboxgl.Popup()
+          .setLngLat(e.lngLat)
+          .setHTML(html)
+          .addTo(map);
+      });
+
+      map.on('mouseenter', 'shipment-points', () => {
+        map.getCanvas().style.cursor = 'pointer';
+      });
+      map.on('mouseleave', 'shipment-points', () => {
+        map.getCanvas().style.cursor = '';
+      });
+
+      // 6. Karte auf alle Punkte zoomen
+      if (points.features.length) {
+        const coords = points.features.map(f => f.geometry.coordinates);
+        const bounds = coords.reduce(
+          (b, c) => b.extend(c),
+          new mapboxgl.LngLatBounds(coords[0], coords[0])
+        );
+        map.fitBounds(bounds, { padding: 40 });
+      }
+    });
+  </script>
+</body>
+</html>
