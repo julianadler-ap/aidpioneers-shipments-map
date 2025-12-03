@@ -1,331 +1,160 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Aid Pioneers Shipments Map</title>
-  <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>Aid Pioneers Shipments</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <!-- Mapbox GL CSS -->
   <link
-    href="https://api.mapbox.com/mapbox-gl-js/v2.16.1/mapbox-gl.css"
+    href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css"
     rel="stylesheet"
   />
-
-  <!-- noUiSlider CSS (für Date-Filter) -->
-  <link
-    href="https://cdn.jsdelivr.net/npm/nouislider@15.7.0/dist/nouislider.min.css"
-    rel="stylesheet"
-  />
-
   <style>
-    body {
+    html, body {
       margin: 0;
       padding: 0;
+      height: 100%;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
     #map {
-      position: absolute;
-      top: 0;
-      bottom: 60px;   /* Platz für Slider */
       width: 100%;
-    }
-    #slider-container {
-      position: absolute;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      height: 60px;
-      background: rgba(255,255,255,0.95);
-      border-top: 1px solid #ddd;
-      display: flex;
-      align-items: center;
-      padding: 8px 16px;
-      box-sizing: border-box;
-      gap: 12px;
-      font-size: 12px;
-    }
-    #slider {
-      flex: 1;
-    }
-    #date-labels {
-      min-width: 180px;
-      text-align: right;
-      line-height: 1.4;
-    }
-    .label-strong {
-      font-weight: 600;
+      height: 100%;
     }
   </style>
 </head>
 <body>
   <div id="map"></div>
 
-  <div id="slider-container">
-    <div>Filter by Date:</div>
-    <div id="slider"></div>
-    <div id="date-labels">
-      <div>From: <span id="date-from" class="label-strong">–</span></div>
-      <div>To: <span id="date-to" class="label-strong">–</span></div>
-    </div>
-  </div>
-
   <!-- Mapbox GL JS -->
-  <script src="https://api.mapbox.com/mapbox-gl-js/v2.16.1/mapbox-gl.js"></script>
-  <!-- noUiSlider JS -->
-  <script src="https://cdn.jsdelivr.net/npm/nouislider@15.7.0/dist/nouislider.min.js"></script>
-
+  <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
   <script>
-    // 1) Deinen Mapbox Public Token hier einsetzen
+    // 1) Mapbox Token eintragen
     mapboxgl.accessToken = 'pk.eyJ1IjoianVsaWFuYWRsZXIiLCJhIjoiY21jZXkxcG55MDMwajJ3c2N5MDFvcjFxYSJ9.1CXb3-6uyCagAxGvpWf4iA';
 
-    // 2) GeoJSON von GitHub (raw URL)
-    const DATA_URL =
-      'https://raw.githubusercontent.com/julianadler-ap/aidpioneers-shipments-map/main/combined.geojson';
-
-    // Helper: Date -> YYYY-MM-DD
-    function formatDate(d) {
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const dd = String(d.getDate()).padStart(2, '0');
-      return `${yyyy}-${mm}-${dd}`;
-    }
-
-    // Karte initialisieren
+    // 2) Karte initialisieren
     const map = new mapboxgl.Map({
       container: 'map',
-      style: 'mapbox://styles/mapbox/streets-v11',
+      style: 'mapbox://styles/mapbox/streets-v11', // oder dein eigener Style
       center: [10, 20],
       zoom: 2
     });
 
-    // Hauptlogik beim Laden der Karte
-    map.on('load', async () => {
-      // 3) GeoJSON holen
-      const resp = await fetch(DATA_URL);
-      const geojson = await resp.json();
+    // 3) GeoJSON von GitHub laden (deine combined.geojson)
+    const DATA_URL =
+      'https://raw.githubusercontent.com/julianadler-ap/aidpioneers-shipments-map/main/combined.geojson';
 
-      const pointFeatures = [];
-      let minTs = Infinity;
-      let maxTs = -Infinity;
+    map.on('load', () => {
+      fetch(DATA_URL)
+        .then(resp => resp.json())
+        .then(geojson => {
+          // Punkte aus GeoJSON nehmen
+          map.addSource('shipments', {
+            type: 'geojson',
+            data: geojson
+          });
 
-      // 3a) POINT-Features aufbereiten (inkl. timestamp + legNum)
-      geojson.features.forEach(f => {
-        const props = f.properties || {};
-        if (props['Row Type'] !== 'POINT') return;
+          // Punkt-Layer
+          map.addLayer({
+            id: 'shipment-points',
+            type: 'circle',
+            source: 'shipments',
+            paint: {
+              'circle-radius': 4,
+              'circle-color': '#e53935',
+              'circle-stroke-width': 1,
+              'circle-stroke-color': '#ffffff'
+            }
+          });
 
-        const rawDate = props['DateTime'];
-        if (!rawDate) return;
+          // Linien pro Container aus den Punkten bauen
+          const routesByContainer = {};
+          geojson.features.forEach(f => {
+            const props = f.properties || {};
+            if (props['Row Type'] !== 'POINT') return;
+            if (props['API Status'] && props['API Status'] !== 'success') return;
 
-        const d = new Date(rawDate);
-        if (isNaN(d.getTime())) return;
+            const container = props['Container Number'];
+            if (!container) return;
 
-        const ts = d.getTime();
-        props.timestamp = ts;
+            if (!routesByContainer[container]) routesByContainer[container] = [];
+            routesByContainer[container].push({
+              leg: Number(props['Leg #']),
+              coord: f.geometry.coordinates
+            });
+          });
 
-        const legRaw = props['Leg #'];
-        const legNum = Number(legRaw);
-        props.legNum = isNaN(legNum) ? null : legNum;
+          const lineFeatures = [];
+          Object.keys(routesByContainer).forEach(container => {
+            const pts = routesByContainer[container]
+              .filter(p => Array.isArray(p.coord) && p.coord.length === 2)
+              .sort((a, b) =>
+                (!isNaN(a.leg) && !isNaN(b.leg))
+                  ? a.leg - b.leg
+                  : 0
+              )
+              .map(p => p.coord);
 
-        if (ts < minTs) minTs = ts;
-        if (ts > maxTs) maxTs = ts;
+            if (pts.length > 1) {
+              lineFeatures.push({
+                type: 'Feature',
+                geometry: {
+                  type: 'LineString',
+                  coordinates: pts
+                },
+                properties: { container }
+              });
+            }
+          });
 
-        if (!f.geometry || !Array.isArray(f.geometry.coordinates)) return;
+          map.addSource('shipment-lines', {
+            type: 'geojson',
+            data: {
+              type: 'FeatureCollection',
+              features: lineFeatures
+            }
+          });
 
-        pointFeatures.push({
-          type: 'Feature',
-          geometry: f.geometry,
-          properties: props
-        });
-      });
+          map.addLayer({
+            id: 'shipment-lines-layer',
+            type: 'line',
+            source: 'shipment-lines',
+            layout: {
+              'line-join': 'round',
+              'line-cap': 'round'
+            },
+            paint: {
+              'line-color': '#1565c0',
+              'line-width': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                2, 1.5,
+                4, 2,
+                6, 3,
+                8, 4
+              ],
+              'line-opacity': 0.75
+            }
+          });
 
-      const pointsCollection = {
-        type: 'FeatureCollection',
-        features: pointFeatures
-      };
-
-      // 3b) Linien pro Container aus den Punkten bauen
-      const byContainer = {};
-      pointFeatures.forEach(f => {
-        const c = f.properties['Container Number'] || 'unknown';
-        if (!byContainer[c]) byContainer[c] = [];
-        byContainer[c].push(f);
-      });
-
-      const lineFeatures = [];
-      Object.keys(byContainer).forEach(container => {
-        const pts = byContainer[container].slice().sort((a, b) => {
-          const la = a.properties.legNum;
-          const lb = b.properties.legNum;
-          if (la != null && lb != null && !isNaN(la) && !isNaN(lb)) {
-            return la - lb;
+          // Karte auf alle Punkte zoomen
+          const bounds = new mapboxgl.LngLatBounds();
+          geojson.features.forEach(f => {
+            if (f.geometry &&
+                f.geometry.type === 'Point' &&
+                Array.isArray(f.geometry.coordinates)) {
+              bounds.extend(f.geometry.coordinates);
+            }
+          });
+          if (!bounds.isEmpty()) {
+            map.fitBounds(bounds, { padding: 40 });
           }
-          return (a.properties.timestamp || 0) - (b.properties.timestamp || 0);
+        })
+        .catch(err => {
+          console.error('Error loading GeoJSON', err);
         });
-
-        if (pts.length < 2) return;
-
-        const coords = pts.map(f => f.geometry.coordinates);
-        let lineMinTs = Infinity;
-        let lineMaxTs = -Infinity;
-        pts.forEach(f => {
-          const ts = f.properties.timestamp;
-          if (ts < lineMinTs) lineMinTs = ts;
-          if (ts > lineMaxTs) lineMaxTs = ts;
-        });
-
-        lineFeatures.push({
-          type: 'Feature',
-          geometry: {
-            type: 'LineString',
-            coordinates: coords
-          },
-          properties: {
-            container: container,
-            minTimestamp: lineMinTs,
-            maxTimestamp: lineMaxTs,
-            projectCode: pts[0].properties['Project Code'] || ''
-          }
-        });
-      });
-
-      const linesCollection = {
-        type: 'FeatureCollection',
-        features: lineFeatures
-      };
-
-      // 4) Quellen + Layer: erst Linien, dann Punkte
-      map.addSource('shipment-lines', {
-        type: 'geojson',
-        data: linesCollection
-      });
-
-      map.addLayer({
-  id: 'shipment-lines-layer',
-  type: 'line',
-  source: 'shipment-lines',
-  layout: {
-    'line-join': 'round',
-    'line-cap': 'round'
-  },
-  paint: {
-    // kräftiges Blau, ähnlich VesselFinder
-    'line-color': '#1565c0',
-    // etwas dicker
-    'line-width': [
-      'interpolate',
-      ['linear'],
-      ['zoom'],
-      2, 1.5,
-      4, 2,
-      6, 3,
-      8, 4
-    ],
-    // leicht transparent
-    'line-opacity': 0.75
-  }
-});
-
-      map.addSource('shipments', {
-        type: 'geojson',
-        data: pointsCollection
-      });
-
-      map.addLayer({
-        id: 'shipment-points',
-        type: 'circle',
-        source: 'shipments',
-        paint: {
-          'circle-radius': 4,
-          'circle-color': '#ff5722',
-          'circle-stroke-width': 1,
-          'circle-stroke-color': '#ffffff'
-        }
-      });
-
-      // Popups auf Punkten
-      map.on('click', 'shipment-points', (e) => {
-        const f = e.features[0];
-        const p = f.properties || {};
-        const dt = p.DateTime ? new Date(p.DateTime) : null;
-
-        const html = `
-          <strong>${p['Container Number'] || ''}</strong><br/>
-          Project: ${p['Project Code'] || ''}<br/>
-          Partner: ${p['Local Partner'] || ''}<br/>
-          Location: ${p['Location Name'] || ''}<br/>
-          Date: ${dt ? formatDate(dt) : ''}
-        `;
-
-        new mapboxgl.Popup()
-          .setLngLat(e.lngLat)
-          .setHTML(html)
-          .addTo(map);
-      });
-
-      map.on('mouseenter', 'shipment-points', () => {
-        map.getCanvas().style.cursor = 'pointer';
-      });
-      map.on('mouseleave', 'shipment-points', () => {
-        map.getCanvas().style.cursor = '';
-      });
-
-      // Auf alle Punkte zoomen
-      if (pointFeatures.length) {
-        const coords = pointFeatures.map(f => f.geometry.coordinates);
-        const bounds = coords.reduce(
-          (b, c) => b.extend(c),
-          new mapboxgl.LngLatBounds(coords[0], coords[0])
-        );
-        map.fitBounds(bounds, { padding: 40 });
-      }
-
-      // 5) Date-Range-Slider initialisieren
-      if (minTs !== Infinity && maxTs !== -Infinity) {
-        initDateSlider(minTs, maxTs);
-      }
     });
-
-    function initDateSlider(minTs, maxTs) {
-      const slider = document.getElementById('slider');
-      const fromLabel = document.getElementById('date-from');
-      const toLabel = document.getElementById('date-to');
-
-      noUiSlider.create(slider, {
-        start: [minTs, maxTs],
-        connect: true,
-        range: {
-          min: minTs,
-          max: maxTs
-        }
-      });
-
-      // initial labels
-      fromLabel.textContent = formatDate(new Date(minTs));
-      toLabel.textContent = formatDate(new Date(maxTs));
-
-      slider.noUiSlider.on('update', (values) => {
-        const fromTs = Math.round(values[0]);
-        const toTs = Math.round(values[1]);
-
-        fromLabel.textContent = formatDate(new Date(fromTs));
-        toLabel.textContent = formatDate(new Date(toTs));
-
-        // Punkte filtern: timestamp zwischen from/to
-        map.setFilter('shipment-points', [
-          'all',
-          ['>=', ['get', 'timestamp'], fromTs],
-          ['<=', ['get', 'timestamp'], toTs]
-        ]);
-
-        // Linien filtern: wenn Linie irgendeinen Teil im Fenster hat:
-        // maxTimestamp >= fromTs UND minTimestamp <= toTs
-        map.setFilter('shipment-lines-layer', [
-          'all',
-          ['<=', ['get', 'minTimestamp'], toTs],
-          ['>=', ['get', 'maxTimestamp'], fromTs]
-        ]);
-      });
-    }
   </script>
 </body>
 </html>
