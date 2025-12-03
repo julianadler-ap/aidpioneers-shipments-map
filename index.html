@@ -200,19 +200,30 @@
       });
 
       map.addLayer({
-        id: 'shipment-lines-layer',
-        type: 'line',
-        source: 'shipment-lines',
-        layout: {
-          'line-join': 'round',
-          'line-cap': 'round'
-        },
-        paint: {
-          'line-color': '#1565c0',
-          'line-width': 2,
-          'line-opacity': 0.6
-        }
-      });
+  id: 'shipment-lines-layer',
+  type: 'line',
+  source: 'shipment-lines',
+  layout: {
+    'line-join': 'round',
+    'line-cap': 'round'
+  },
+  paint: {
+    // kräftiges Blau, ähnlich VesselFinder
+    'line-color': '#1565c0',
+    // etwas dicker
+    'line-width': [
+      'interpolate',
+      ['linear'],
+      ['zoom'],
+      2, 1.5,
+      4, 2,
+      6, 3,
+      8, 4
+    ],
+    // leicht transparent
+    'line-opacity': 0.75
+  }
+});
 
       map.addSource('shipments', {
         type: 'geojson',
