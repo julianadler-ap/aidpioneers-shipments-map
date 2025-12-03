@@ -79,7 +79,8 @@
     mapboxgl.accessToken = 'pk.eyJ1IjoianVsaWFuYWRsZXIiLCJhIjoiY21jZXkxcG55MDMwajJ3c2N5MDFvcjFxYSJ9.1CXb3-6uyCagAxGvpWf4iA';
 
     // 2) GeoJSON von GitHub (raw URL)
-    const DATA_URL = 'https://raw.githubusercontent.com/julianadler-ap/aidpioneers-shipments-map/main/combined.geojson';
+    const DATA_URL =
+      'https://raw.githubusercontent.com/julianadler-ap/aidpioneers-shipments-map/main/combined.geojson';
 
     // Helper: Date -> YYYY-MM-DD
     function formatDate(d) {
@@ -103,16 +104,15 @@
       const resp = await fetch(DATA_URL);
       const geojson = await resp.json();
 
-      // Aus POINT-Zeilen Features bauen und Timestamp schreiben
-      const features = [];
+      const pointFeatures = [];
       let minTs = Infinity;
       let maxTs = -Infinity;
 
+      // 3a) POINT-Features aufbereiten (inkl. timestamp + legNum)
       geojson.features.forEach(f => {
         const props = f.properties || {};
         if (props['Row Type'] !== 'POINT') return;
 
-        // DateTime kann String oder Date sein – wir normalisieren
         const rawDate = props['DateTime'];
         if (!rawDate) return;
 
@@ -120,30 +120,103 @@
         if (isNaN(d.getTime())) return;
 
         const ts = d.getTime();
-        props.timestamp = ts; // numeric property für Filter
+        props.timestamp = ts;
+
+        const legRaw = props['Leg #'];
+        const legNum = Number(legRaw);
+        props.legNum = isNaN(legNum) ? null : legNum;
 
         if (ts < minTs) minTs = ts;
         if (ts > maxTs) maxTs = ts;
 
-        // Sicherstellen, dass Geometrie Koordinaten hat
         if (!f.geometry || !Array.isArray(f.geometry.coordinates)) return;
 
-        features.push({
+        pointFeatures.push({
           type: 'Feature',
           geometry: f.geometry,
           properties: props
         });
       });
 
-      const filteredCollection = {
+      const pointsCollection = {
         type: 'FeatureCollection',
-        features: features
+        features: pointFeatures
       };
 
-      // 4) Source + Layer
+      // 3b) Linien pro Container aus den Punkten bauen
+      const byContainer = {};
+      pointFeatures.forEach(f => {
+        const c = f.properties['Container Number'] || 'unknown';
+        if (!byContainer[c]) byContainer[c] = [];
+        byContainer[c].push(f);
+      });
+
+      const lineFeatures = [];
+      Object.keys(byContainer).forEach(container => {
+        const pts = byContainer[container].slice().sort((a, b) => {
+          const la = a.properties.legNum;
+          const lb = b.properties.legNum;
+          if (la != null && lb != null && !isNaN(la) && !isNaN(lb)) {
+            return la - lb;
+          }
+          return (a.properties.timestamp || 0) - (b.properties.timestamp || 0);
+        });
+
+        if (pts.length < 2) return;
+
+        const coords = pts.map(f => f.geometry.coordinates);
+        let lineMinTs = Infinity;
+        let lineMaxTs = -Infinity;
+        pts.forEach(f => {
+          const ts = f.properties.timestamp;
+          if (ts < lineMinTs) lineMinTs = ts;
+          if (ts > lineMaxTs) lineMaxTs = ts;
+        });
+
+        lineFeatures.push({
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: coords
+          },
+          properties: {
+            container: container,
+            minTimestamp: lineMinTs,
+            maxTimestamp: lineMaxTs,
+            projectCode: pts[0].properties['Project Code'] || ''
+          }
+        });
+      });
+
+      const linesCollection = {
+        type: 'FeatureCollection',
+        features: lineFeatures
+      };
+
+      // 4) Quellen + Layer: erst Linien, dann Punkte
+      map.addSource('shipment-lines', {
+        type: 'geojson',
+        data: linesCollection
+      });
+
+      map.addLayer({
+        id: 'shipment-lines-layer',
+        type: 'line',
+        source: 'shipment-lines',
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round'
+        },
+        paint: {
+          'line-color': '#1565c0',
+          'line-width': 2,
+          'line-opacity': 0.6
+        }
+      });
+
       map.addSource('shipments', {
         type: 'geojson',
-        data: filteredCollection
+        data: pointsCollection
       });
 
       map.addLayer({
@@ -158,7 +231,7 @@
         }
       });
 
-      // Popups
+      // Popups auf Punkten
       map.on('click', 'shipment-points', (e) => {
         const f = e.features[0];
         const p = f.properties || {};
@@ -186,8 +259,8 @@
       });
 
       // Auf alle Punkte zoomen
-      if (features.length) {
-        const coords = features.map(f => f.geometry.coordinates);
+      if (pointFeatures.length) {
+        const coords = pointFeatures.map(f => f.geometry.coordinates);
         const bounds = coords.reduce(
           (b, c) => b.extend(c),
           new mapboxgl.LngLatBounds(coords[0], coords[0])
@@ -226,11 +299,19 @@
         fromLabel.textContent = formatDate(new Date(fromTs));
         toLabel.textContent = formatDate(new Date(toTs));
 
-        // Mapbox-Filter setzen
+        // Punkte filtern: timestamp zwischen from/to
         map.setFilter('shipment-points', [
           'all',
           ['>=', ['get', 'timestamp'], fromTs],
           ['<=', ['get', 'timestamp'], toTs]
+        ]);
+
+        // Linien filtern: wenn Linie irgendeinen Teil im Fenster hat:
+        // maxTimestamp >= fromTs UND minTimestamp <= toTs
+        map.setFilter('shipment-lines-layer', [
+          'all',
+          ['<=', ['get', 'minTimestamp'], toTs],
+          ['>=', ['get', 'maxTimestamp'], fromTs]
         ]);
       });
     }
