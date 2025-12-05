@@ -11,12 +11,13 @@
     html, body { height: 100%; margin: 0; }
     body { overflow: hidden; background: #02060c; }
 
-    /* Full-bleed container with “space” background */
+    /* Full-bleed */
     #mapWrap{
-      position: relative;
-      height: 100vh;
-      width: 100vw;
+      position: fixed;
+      inset: 0;
       overflow: hidden;
+
+      /* “space” behind the globe */
       background:
         radial-gradient(circle at 30% 30%, rgba(120,170,255,0.18) 0%, rgba(0,0,0,0) 40%),
         radial-gradient(circle at 70% 60%, rgba(255,255,255,0.08) 0%, rgba(0,0,0,0) 45%),
@@ -30,25 +31,25 @@
       background:
         radial-gradient(circle, rgba(255,255,255,0.35) 1px, transparent 2px) 0 0/120px 120px,
         radial-gradient(circle, rgba(255,255,255,0.25) 1px, transparent 2px) 40px 60px/180px 180px;
-      opacity: 0.25;
+      opacity: 0.22;
       pointer-events:none;
       z-index: 1;
     }
 
-    /* Map on top of the space */
+    /* Map sits on top */
     #map { position: absolute; inset: 0; z-index: 2; }
 
-    /* Globe vignette (the “styled” feel) */
+    /* vignette to match the styled reference */
     .vignette{
       pointer-events: none;
       position: absolute; inset: 0;
       background:
         radial-gradient(ellipse at 65% 45%, rgba(255,255,255,0.10) 0%, rgba(0,0,0,0.0) 40%),
-        radial-gradient(ellipse at 65% 60%, rgba(0,0,0,0.0) 40%, rgba(0,0,0,0.40) 75%, rgba(0,0,0,0.75) 100%);
+        radial-gradient(ellipse at 65% 60%, rgba(0,0,0,0.0) 40%, rgba(0,0,0,0.40) 75%, rgba(0,0,0,0.78) 100%);
       z-index: 5;
     }
 
-    /* Popups (clean, like your styled version) */
+    /* Popups */
     .mapboxgl-popup{ z-index:3000!important; border-radius:20px; overflow:hidden; }
     .mapboxgl-popup-content{
       font:13px/1.5 system-ui, -apple-system, Segoe UI, Arial, sans-serif;
@@ -62,7 +63,7 @@
     @keyframes popupFade{ from{ transform:translateY(6px); opacity:0 } to{ transform:none; opacity:1 } }
     .hover-tip .mapboxgl-popup-content{ padding:6px 10px; font-weight:800; border-radius:12px; }
 
-    /* Hide ALL Mapbox UI controls (menu/buttons) */
+    /* Hide ALL Mapbox UI controls (the “menu”) */
     .mapboxgl-ctrl-top-right,
     .mapboxgl-ctrl-top-left,
     .mapboxgl-ctrl-bottom-right,
@@ -70,8 +71,9 @@
       display:none !important;
     }
 
-    /* If you ever embed into a page that has fullscreen chrome */
-    :fullscreen header, :fullscreen nav, :fullscreen .site-header{ display:none!important; }
+    /* Also hide the attribution/logo if it appears (note: Mapbox TOS may require attribution) */
+    .mapboxgl-ctrl-attrib { display:none !important; }
+    a.mapboxgl-ctrl-logo { display:none !important; }
   </style>
 </head>
 
@@ -83,38 +85,25 @@
 
   <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
   <script>
-    /*****************************************************************
-      CONFIG
-    *****************************************************************/
     mapboxgl.accessToken = 'pk.eyJ1IjoianVsaWFuYWRsZXIiLCJhIjoiY21jZXkxcG55MDMwajJ3c2N5MDFvcjFxYSJ9.1CXb3-6uyCagAxGvpWf4iA';
 
-    // Your exact styled theme:
     const STYLE = 'mapbox://styles/lillysturz/cmcdif4wb00ty01sb0z5yf7bk';
+    const DATA_URL = 'https://raw.githubusercontent.com/julianadler-ap/aidpioneers-shipments-map/main/combined.geojson';
 
-    const DATA_URL =
-      'https://raw.githubusercontent.com/julianadler-ap/aidpioneers-shipments-map/main/combined.geojson';
-
-    /*****************************************************************
-      MAP INIT (no controls added = no “menu”)
-    *****************************************************************/
     const map = new mapboxgl.Map({
       container: 'map',
       style: STYLE,
       projection: 'globe',
 
-      // Big “cropped globe” framing similar to your reference
+      // Camera tuned for “big cropped globe”
       center: [25, 20],
       zoom: 1.85,
       bearing: -12,
       pitch: 0,
 
-      // Keep attribution control off (we're also hiding UI via CSS)
       attributionControl: false
     });
 
-    /*****************************************************************
-      FOG / SPACE TUNING (match background)
-    *****************************************************************/
     map.on('style.load', () => {
       try {
         map.setFog({
@@ -127,9 +116,7 @@
       } catch (_) {}
     });
 
-    /*****************************************************************
-      HOVER TOOLTIP (optional but nice)
-    *****************************************************************/
+    // Hover tooltip
     let hoverPopup = null;
     function attachHoverToLayer(layerId, getHtml) {
       map.on('mousemove', layerId, (e) => {
@@ -155,19 +142,13 @@
       });
     }
 
-    /*****************************************************************
-      LOAD + DRAW
-    *****************************************************************/
     map.on('load', () => {
-      fetch(`${DATA_URL}?t=${Date.now()}`) // cache-bust GitHub raw
-        .then(r => {
-          if (!r.ok) throw new Error(`GeoJSON fetch failed (${r.status})`);
-          return r.json();
-        })
+      fetch(`${DATA_URL}?t=${Date.now()}`)
+        .then(r => { if (!r.ok) throw new Error(`GeoJSON fetch failed (${r.status})`); return r.json(); })
         .then(geojson => {
           map.addSource('shipments', { type: 'geojson', data: geojson });
 
-          // POINTS
+          // Points
           map.addLayer({
             id: 'shipment-points',
             type: 'circle',
@@ -181,7 +162,7 @@
             }
           });
 
-          // LINES per container from points
+          // Lines per container from points
           const routesByContainer = {};
           for (const f of geojson.features || []) {
             const p = f.properties || {};
