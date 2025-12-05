@@ -11,20 +11,18 @@
     html, body { height: 100%; margin: 0; }
     body { overflow: hidden; background: #02060c; }
 
-    /* Full-bleed */
+    /* Full-bleed container + “space” background */
     #mapWrap{
       position: fixed;
       inset: 0;
       overflow: hidden;
-
-      /* “space” behind the globe */
       background:
         radial-gradient(circle at 30% 30%, rgba(120,170,255,0.18) 0%, rgba(0,0,0,0) 40%),
         radial-gradient(circle at 70% 60%, rgba(255,255,255,0.08) 0%, rgba(0,0,0,0) 45%),
         radial-gradient(circle at 50% 50%, #0b223b 0%, #05101f 60%, #02060c 100%);
     }
 
-    /* subtle star field */
+    /* subtle stars */
     #mapWrap::before{
       content:"";
       position:absolute; inset:-20%;
@@ -36,10 +34,9 @@
       z-index: 1;
     }
 
-    /* Map sits on top */
     #map { position: absolute; inset: 0; z-index: 2; }
 
-    /* vignette to match the styled reference */
+    /* vignette overlay */
     .vignette{
       pointer-events: none;
       position: absolute; inset: 0;
@@ -63,7 +60,7 @@
     @keyframes popupFade{ from{ transform:translateY(6px); opacity:0 } to{ transform:none; opacity:1 } }
     .hover-tip .mapboxgl-popup-content{ padding:6px 10px; font-weight:800; border-radius:12px; }
 
-    /* Hide ALL Mapbox UI controls (the “menu”) */
+    /* Hide ALL Mapbox UI controls (“menu”) */
     .mapboxgl-ctrl-top-right,
     .mapboxgl-ctrl-top-left,
     .mapboxgl-ctrl-bottom-right,
@@ -71,7 +68,7 @@
       display:none !important;
     }
 
-    /* Also hide the attribution/logo if it appears (note: Mapbox TOS may require attribution) */
+    /* Optional: hide attribution/logo (may conflict with Mapbox TOS) */
     .mapboxgl-ctrl-attrib { display:none !important; }
     a.mapboxgl-ctrl-logo { display:none !important; }
   </style>
@@ -85,25 +82,35 @@
 
   <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
   <script>
+    /*****************************************************************
+      CONFIG
+    *****************************************************************/
     mapboxgl.accessToken = 'pk.eyJ1IjoianVsaWFuYWRsZXIiLCJhIjoiY21jZXkxcG55MDMwajJ3c2N5MDFvcjFxYSJ9.1CXb3-6uyCagAxGvpWf4iA';
 
+    // Lilly style:
     const STYLE = 'mapbox://styles/lillysturz/cmcdif4wb00ty01sb0z5yf7bk';
+
+    // Your shipments GeoJSON:
     const DATA_URL = 'https://raw.githubusercontent.com/julianadler-ap/aidpioneers-shipments-map/main/combined.geojson';
 
+    /*****************************************************************
+      MAP INIT
+      (neutral initial camera; we will fitBounds to all points after load)
+    *****************************************************************/
     const map = new mapboxgl.Map({
       container: 'map',
       style: STYLE,
       projection: 'globe',
-
-      // Camera tuned for “big cropped globe”
-      center: [25, 20],
-      zoom: 1.85,
-      bearing: -12,
+      center: [10, 20],
+      zoom: 1.1,
+      bearing: 0,
       pitch: 0,
-
       attributionControl: false
     });
 
+    /*****************************************************************
+      FOG / SPACE TUNING
+    *****************************************************************/
     map.on('style.load', () => {
       try {
         map.setFog({
@@ -116,7 +123,9 @@
       } catch (_) {}
     });
 
-    // Hover tooltip
+    /*****************************************************************
+      HOVER TOOLTIP
+    *****************************************************************/
     let hoverPopup = null;
     function attachHoverToLayer(layerId, getHtml) {
       map.on('mousemove', layerId, (e) => {
@@ -142,13 +151,16 @@
       });
     }
 
+    /*****************************************************************
+      LOAD + DRAW
+    *****************************************************************/
     map.on('load', () => {
-      fetch(`${DATA_URL}?t=${Date.now()}`)
+      fetch(`${DATA_URL}?t=${Date.now()}`) // cache-bust GitHub raw
         .then(r => { if (!r.ok) throw new Error(`GeoJSON fetch failed (${r.status})`); return r.json(); })
         .then(geojson => {
           map.addSource('shipments', { type: 'geojson', data: geojson });
 
-          // Points
+          // POINTS
           map.addLayer({
             id: 'shipment-points',
             type: 'circle',
@@ -162,7 +174,7 @@
             }
           });
 
-          // Lines per container from points
+          // Build LINES per container from points
           const routesByContainer = {};
           for (const f of geojson.features || []) {
             const p = f.properties || {};
@@ -211,7 +223,7 @@
             }
           });
 
-          // Click popup
+          // Click popup (optional)
           map.on('click', 'shipment-points', (e) => {
             const f = e.features && e.features[0];
             if (!f) return;
@@ -236,6 +248,24 @@
             const p = f.properties || {};
             return `Container ${p['Container Number'] || '—'} · Leg ${p['Leg #'] || '—'}`;
           });
+
+          /*****************************************************************
+            ✅ FIT TO ALL POINTS (prevents "only Ukraine" view)
+          *****************************************************************/
+          const bounds = new mapboxgl.LngLatBounds();
+          for (const f of geojson.features || []) {
+            if (f.geometry?.type === "Point" && Array.isArray(f.geometry.coordinates)) {
+              bounds.extend(f.geometry.coordinates);
+            }
+          }
+
+          if (!bounds.isEmpty()) {
+            map.fitBounds(bounds, {
+              padding: 80,
+              maxZoom: 2.2,     // keep it global
+              duration: 1200
+            });
+          }
         })
         .catch(console.error);
     });
