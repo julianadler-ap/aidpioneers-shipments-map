@@ -4,14 +4,42 @@
   <meta charset="utf-8" />
   <title>Aid Pioneers Shipments</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" />
-  <style>
-    html, body { height: 100%; margin: 0; background:#050f1c; }
-    #mapWrap { position: relative; height: 100vh; width: 100vw; overflow: hidden; }
-    #map { position: absolute; inset: 0; }
 
-    /* Globe vignette (this is a big part of the “styled” look) */
-    .vignette {
+  <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" />
+
+  <style>
+    html, body { height: 100%; margin: 0; }
+    body { overflow: hidden; background: #02060c; }
+
+    /* Full-bleed container with “space” background */
+    #mapWrap{
+      position: relative;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 30% 30%, rgba(120,170,255,0.18) 0%, rgba(0,0,0,0) 40%),
+        radial-gradient(circle at 70% 60%, rgba(255,255,255,0.08) 0%, rgba(0,0,0,0) 45%),
+        radial-gradient(circle at 50% 50%, #0b223b 0%, #05101f 60%, #02060c 100%);
+    }
+
+    /* subtle star field */
+    #mapWrap::before{
+      content:"";
+      position:absolute; inset:-20%;
+      background:
+        radial-gradient(circle, rgba(255,255,255,0.35) 1px, transparent 2px) 0 0/120px 120px,
+        radial-gradient(circle, rgba(255,255,255,0.25) 1px, transparent 2px) 40px 60px/180px 180px;
+      opacity: 0.25;
+      pointer-events:none;
+      z-index: 1;
+    }
+
+    /* Map on top of the space */
+    #map { position: absolute; inset: 0; z-index: 2; }
+
+    /* Globe vignette (the “styled” feel) */
+    .vignette{
       pointer-events: none;
       position: absolute; inset: 0;
       background:
@@ -20,8 +48,8 @@
       z-index: 5;
     }
 
-    /* Popups (match your styled version) */
-    .mapboxgl-popup { z-index:3000!important; border-radius:20px; overflow:hidden; }
+    /* Popups (clean, like your styled version) */
+    .mapboxgl-popup{ z-index:3000!important; border-radius:20px; overflow:hidden; }
     .mapboxgl-popup-content{
       font:13px/1.5 system-ui, -apple-system, Segoe UI, Arial, sans-serif;
       padding:18px 20px;
@@ -30,12 +58,20 @@
       color:#0F2C4C !important;
       animation: popupFade .25s ease-out;
     }
-    .mapboxgl-popup-close-button, .mapboxgl-popup-tip { display:none; }
-    @keyframes popupFade { from{ transform:translateY(6px); opacity:0 } to{ transform:none; opacity:1 } }
-    .hover-tip .mapboxgl-popup-content { padding:6px 10px; font-weight:800; border-radius:12px; }
+    .mapboxgl-popup-close-button, .mapboxgl-popup-tip{ display:none; }
+    @keyframes popupFade{ from{ transform:translateY(6px); opacity:0 } to{ transform:none; opacity:1 } }
+    .hover-tip .mapboxgl-popup-content{ padding:6px 10px; font-weight:800; border-radius:12px; }
 
-    /* Safety: avoid accidental page scrolling */
-    body { overflow: hidden; }
+    /* Hide ALL Mapbox UI controls (menu/buttons) */
+    .mapboxgl-ctrl-top-right,
+    .mapboxgl-ctrl-top-left,
+    .mapboxgl-ctrl-bottom-right,
+    .mapboxgl-ctrl-bottom-left{
+      display:none !important;
+    }
+
+    /* If you ever embed into a page that has fullscreen chrome */
+    :fullscreen header, :fullscreen nav, :fullscreen .site-header{ display:none!important; }
   </style>
 </head>
 
@@ -47,31 +83,53 @@
 
   <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
   <script>
+    /*****************************************************************
+      CONFIG
+    *****************************************************************/
     mapboxgl.accessToken = 'pk.eyJ1IjoianVsaWFuYWRsZXIiLCJhIjoiY21jZXkxcG55MDMwajJ3c2N5MDFvcjFxYSJ9.1CXb3-6uyCagAxGvpWf4iA';
 
+    // Your exact styled theme:
     const STYLE = 'mapbox://styles/lillysturz/cmcdif4wb00ty01sb0z5yf7bk';
 
     const DATA_URL =
       'https://raw.githubusercontent.com/julianadler-ap/aidpioneers-shipments-map/main/combined.geojson';
 
+    /*****************************************************************
+      MAP INIT (no controls added = no “menu”)
+    *****************************************************************/
     const map = new mapboxgl.Map({
       container: 'map',
       style: STYLE,
       projection: 'globe',
 
-      // Key to "big cropped globe" look:
-      // Africa / MENA in view, globe filling most of frame.
+      // Big “cropped globe” framing similar to your reference
       center: [25, 20],
       zoom: 1.85,
       bearing: -12,
-      pitch: 0
+      pitch: 0,
+
+      // Keep attribution control off (we're also hiding UI via CSS)
+      attributionControl: false
     });
 
-    map.addControl(new mapboxgl.NavigationControl({ showCompass: true }), 'top-right');
-    map.addControl(new mapboxgl.FullscreenControl({ container: document.getElementById('mapWrap') }), 'top-right');
-    map.addControl(new mapboxgl.ScaleControl({ maxWidth: 140, unit: 'metric' }), 'bottom-right');
+    /*****************************************************************
+      FOG / SPACE TUNING (match background)
+    *****************************************************************/
+    map.on('style.load', () => {
+      try {
+        map.setFog({
+          range: [0.8, 8],
+          color: 'rgba(210, 230, 255, 0.08)',
+          'high-color': 'rgba(150, 190, 255, 0.06)',
+          'space-color': '#02060c',
+          'horizon-blend': 0.10
+        });
+      } catch (_) {}
+    });
 
-    // Hover tooltip
+    /*****************************************************************
+      HOVER TOOLTIP (optional but nice)
+    *****************************************************************/
     let hoverPopup = null;
     function attachHoverToLayer(layerId, getHtml) {
       map.on('mousemove', layerId, (e) => {
@@ -97,22 +155,15 @@
       });
     }
 
-    map.on('style.load', () => {
-      // Adds the “atmosphere” vibe (if the style already has fog, this is harmless)
-      try {
-        map.setFog({
-          range: [0.8, 8],
-          color: 'rgba(220, 235, 255, 0.10)',
-          'high-color': 'rgba(150, 190, 255, 0.08)',
-          'space-color': 'rgba(3, 10, 20, 1)',
-          'horizon-blend': 0.12
-        });
-      } catch (_) {}
-    });
-
+    /*****************************************************************
+      LOAD + DRAW
+    *****************************************************************/
     map.on('load', () => {
-      fetch(`${DATA_URL}?t=${Date.now()}`)
-        .then(r => { if (!r.ok) throw new Error(`GeoJSON fetch failed (${r.status})`); return r.json(); })
+      fetch(`${DATA_URL}?t=${Date.now()}`) // cache-bust GitHub raw
+        .then(r => {
+          if (!r.ok) throw new Error(`GeoJSON fetch failed (${r.status})`);
+          return r.json();
+        })
         .then(geojson => {
           map.addSource('shipments', { type: 'geojson', data: geojson });
 
@@ -130,15 +181,20 @@
             }
           });
 
-          // LINES per Container Number from points
+          // LINES per container from points
           const routesByContainer = {};
           for (const f of geojson.features || []) {
             const p = f.properties || {};
             if (p['Row Type'] !== 'POINT') continue;
             if (p['API Status'] && p['API Status'] !== 'success') continue;
+
             const c = p['Container Number'];
             if (!c) continue;
-            (routesByContainer[c] ||= []).push({ leg: Number(p['Leg #']), coord: f.geometry?.coordinates });
+
+            (routesByContainer[c] ||= []).push({
+              leg: Number(p['Leg #']),
+              coord: f.geometry?.coordinates
+            });
           }
 
           const lineFeatures = [];
@@ -178,6 +234,7 @@
           map.on('click', 'shipment-points', (e) => {
             const f = e.features && e.features[0];
             if (!f) return;
+
             const p = f.properties || {};
             const html = `
               <div style="min-width:220px;">
@@ -187,7 +244,10 @@
                 <div><b>Status:</b> ${p['API Status'] || '-'}</div>
               </div>
             `;
-            new mapboxgl.Popup({ offset: 25 }).setLngLat(e.lngLat).setHTML(html).addTo(map);
+            new mapboxgl.Popup({ offset: 25 })
+              .setLngLat(e.lngLat)
+              .setHTML(html)
+              .addTo(map);
           });
 
           // Hover tooltip
