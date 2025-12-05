@@ -18,18 +18,17 @@
     #mapWrap { position:relative; height:100vh; overflow:hidden; }
     #map { position:absolute; inset:0; }
 
-    /* Globe vignette overlay (this is a big part of the “styled” look) */
+    /* Globe vignette overlay (big part of the “styled” look) */
     .vignette {
       pointer-events:none;
       position:absolute; inset:0;
       background:
         radial-gradient(ellipse at 55% 45%, rgba(255,255,255,0.08) 0%, rgba(0,0,0,0.0) 35%),
         radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0.0) 35%, rgba(0,0,0,0.35) 70%, rgba(0,0,0,0.65) 100%);
-      mix-blend-mode: normal;
       z-index:5;
     }
 
-    /* Left panel (like your styled example) */
+    /* Minimal left panel (optional, but matches your styled vibe) */
     .panel {
       position:absolute;
       top:16px; left:16px;
@@ -39,53 +38,28 @@
       border: 1px solid rgba(255,255,255,0.10);
       backdrop-filter: blur(10px);
       border-radius: 14px;
-      padding: 14px 14px;
+      padding: 14px;
       color: #fff;
       z-index: 10;
       box-shadow: 0 10px 30px rgba(0,0,0,0.30);
     }
-    .panel h1 {
-      margin:0 0 8px;
-      font-size: 14px;
-      font-weight: 700;
-      letter-spacing: 0.2px;
-      opacity: 0.95;
-    }
-    .panel p {
-      margin: 0 0 12px;
-      font-size: 12px;
-      line-height: 1.35;
-      opacity: 0.85;
-    }
-    .row { display:flex; gap:8px; align-items:center; }
+    .panel h1 { margin:0 0 8px; font-size:14px; font-weight:700; opacity:0.95; }
+    .panel p  { margin:0 0 12px; font-size:12px; line-height:1.35; opacity:0.85; }
     .pill {
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      padding: 8px 10px;
-      border-radius: 10px;
+      display:inline-flex; align-items:center; gap:8px;
+      padding:8px 10px; border-radius:10px;
       background: rgba(255,255,255,0.08);
       border: 1px solid rgba(255,255,255,0.12);
-      font-size: 12px;
-      font-weight: 600;
-      margin-bottom: 10px;
+      font-size:12px; font-weight:600; margin-right:8px;
     }
-    .dot { width:10px; height:10px; border-radius:999px; background:#E20074; box-shadow: 0 0 0 3px rgba(226,0,116,0.22); }
-    .dot.blue { background:#0F2C4C; box-shadow: 0 0 0 3px rgba(15,44,76,0.22); }
+    .dot { width:10px; height:10px; border-radius:999px; background:#E20074; box-shadow:0 0 0 3px rgba(226,0,116,0.22); }
+    .dot.blue { background:#0F2C4C; box-shadow:0 0 0 3px rgba(15,44,76,0.22); }
 
-    .divider {
-      height: 1px;
-      background: rgba(255,255,255,0.12);
-      margin: 12px 0;
-    }
-
-    /* Build stamp (so you can SEE you’re on the new deploy) */
+    /* Deployment proof */
     .stamp {
-      position:absolute;
-      right: 16px;
-      bottom: 14px;
-      z-index: 10;
-      font-size: 11px;
+      position:absolute; right:16px; bottom:14px;
+      z-index:10;
+      font-size:11px;
       color: rgba(255,255,255,0.8);
       background: rgba(0,0,0,0.35);
       border: 1px solid rgba(255,255,255,0.12);
@@ -94,7 +68,7 @@
       backdrop-filter: blur(8px);
     }
 
-    /* Popups like “second code” */
+    /* Popups like your styled code */
     .mapboxgl-popup { z-index:3000!important; border-radius:20px; overflow:hidden; }
     .mapboxgl-popup-content{
       font:13px/1.5 "Inter", Arial, sans-serif;
@@ -106,14 +80,11 @@
     }
     .mapboxgl-popup-close-button, .mapboxgl-popup-tip { display:none; }
     @keyframes popupFade { from{ transform:translateY(6px); opacity:0 } to{ transform:none; opacity:1 } }
-    .hover-tip .mapboxgl-popup-content { padding:6px 10px; font-weight:700; border-radius:12px; }
+    .hover-tip .mapboxgl-popup-content { padding:6px 10px; font-weight:800; border-radius:12px; }
 
-    /* Hide site chrome in fullscreen */
     :fullscreen header, :fullscreen nav, :fullscreen .site-header{ display:none!important; }
 
-    @media (max-width: 700px){
-      .panel { width: 280px; }
-    }
+    @media (max-width: 700px) { .panel { width: 280px; } }
   </style>
 </head>
 
@@ -124,18 +95,11 @@
 
     <div class="panel">
       <h1>Aid Pioneers · Shipments Map</h1>
-      <p>Interactive overview of shipment points and route legs. Hover for quick info, click for details.</p>
-
-      <div class="row">
-        <div class="pill"><span class="dot"></span> Points</div>
-        <div class="pill"><span class="dot blue"></span> Routes</div>
+      <p>Hover for quick info, click for details. Styled with Lilly’s Mapbox theme.</p>
+      <div>
+        <span class="pill"><span class="dot"></span> Points</span>
+        <span class="pill"><span class="dot blue"></span> Routes</span>
       </div>
-
-      <div class="divider"></div>
-
-      <p style="margin:0; opacity:.8">
-        If you still see a light street map, your GitHub Pages is serving a different folder/branch.
-      </p>
     </div>
 
     <div class="stamp" id="buildStamp">Build: —</div>
@@ -148,10 +112,8 @@
     *****************************************************************/
     mapboxgl.accessToken = 'pk.eyJ1IjoianVsaWFuYWRsZXIiLCJhIjoiY21jZXkxcG55MDMwajJ3c2N5MDFvcjFxYSJ9.1CXb3-6uyCagAxGvpWf4iA';
 
-    // IMPORTANT: This is what drives the “styled look”.
-    // Use your own custom style URL if you have one.
-    // If you don’t, keep this dark Mapbox preset:
-    const BASE_STYLE = 'mapbox://styles/mapbox/dark-v11';
+    // ✅ Your styled Mapbox theme:
+    const BASE_STYLE = 'mapbox://styles/lillysturz/cmcdif4wb00ty01sb0z5yf7bk';
 
     const DATA_URL =
       'https://raw.githubusercontent.com/julianadler-ap/aidpioneers-shipments-map/main/combined.geojson';
@@ -171,7 +133,7 @@
       style: BASE_STYLE,
       center: [10, 20],
       zoom: 2,
-      projection: 'globe' // key for the “globe” feel
+      projection: 'globe'
     });
 
     map.addControl(new mapboxgl.FullscreenControl({ container: document.getElementById('mapWrap') }), 'top-right');
@@ -182,6 +144,7 @@
       HOVER TOOLTIP
     *****************************************************************/
     let hoverPopup = null;
+
     function attachHoverToLayer(layerId, getHtml) {
       map.on('mousemove', layerId, (e) => {
         map.getCanvas().style.cursor = 'pointer';
@@ -207,19 +170,26 @@
     }
 
     /*****************************************************************
-      LOAD + DRAW
+      STYLE LOAD: add atmosphere if desired
     *****************************************************************/
     map.on('style.load', () => {
-      // Atmosphere = extra “styled/globe” sauce
-      map.setFog({
-        range: [0.8, 8],
-        color: 'rgba(220, 235, 255, 0.15)',
-        'high-color': 'rgba(150, 190, 255, 0.10)',
-        'space-color': 'rgba(3, 10, 20, 1)',
-        'horizon-blend': 0.12
-      });
+      // If Lilly’s style already defines fog/atmosphere, this is harmless.
+      try {
+        map.setFog({
+          range: [0.8, 8],
+          color: 'rgba(220, 235, 255, 0.10)',
+          'high-color': 'rgba(150, 190, 255, 0.08)',
+          'space-color': 'rgba(3, 10, 20, 1)',
+          'horizon-blend': 0.12
+        });
+      } catch (e) {
+        console.log('Fog not applied:', e);
+      }
     });
 
+    /*****************************************************************
+      LOAD + DRAW
+    *****************************************************************/
     map.on('load', () => {
       fetch(`${DATA_URL}?t=${Date.now()}`) // cache-bust RAW github
         .then(resp => {
@@ -229,7 +199,7 @@
         .then(geojson => {
           map.addSource('shipments', { type: 'geojson', data: geojson });
 
-          // POINTS (pink)
+          // Pink points
           map.addLayer({
             id: 'shipment-points',
             type: 'circle',
@@ -243,7 +213,7 @@
             }
           });
 
-          // LINES by Container Number from points
+          // Build lines per container from points
           const routesByContainer = {};
           geojson.features.forEach(f => {
             const props = f.properties || {};
@@ -322,7 +292,7 @@
             return `Container ${container} · Leg ${leg}`;
           });
 
-          // Fit bounds
+          // Fit bounds to all points
           const bounds = new mapboxgl.LngLatBounds();
           geojson.features.forEach(f => {
             if (f.geometry?.type === 'Point' && Array.isArray(f.geometry.coordinates)) {
