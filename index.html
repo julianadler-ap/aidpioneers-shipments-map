@@ -8,22 +8,25 @@
   <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" />
 
   <style>
+    /* ===== Layout (full bleed, no sidebar) ===== */
     html, body { height: 100%; margin: 0; }
     body { overflow: hidden; background: #02060c; }
 
-    /* Full-bleed container + “space” background */
-    #mapWrap{
-      position: fixed;
-      inset: 0;
-      overflow: hidden;
+    #mapWrap { position: fixed; inset: 0; }
+
+    /* “space” outside the globe (matches your styled vibe) */
+    #mapWrap::before{
+      content:"";
+      position:absolute; inset:0;
       background:
         radial-gradient(circle at 30% 30%, rgba(120,170,255,0.18) 0%, rgba(0,0,0,0) 40%),
         radial-gradient(circle at 70% 60%, rgba(255,255,255,0.08) 0%, rgba(0,0,0,0) 45%),
         radial-gradient(circle at 50% 50%, #0b223b 0%, #05101f 60%, #02060c 100%);
+      z-index: 0;
     }
 
     /* subtle stars */
-    #mapWrap::before{
+    #mapWrap::after{
       content:"";
       position:absolute; inset:-20%;
       background:
@@ -46,21 +49,39 @@
       z-index: 5;
     }
 
-    /* Popups */
+    /* ===== Popups (from your reference) ===== */
     .mapboxgl-popup{ z-index:3000!important; border-radius:20px; overflow:hidden; }
     .mapboxgl-popup-content{
-      font:13px/1.5 system-ui, -apple-system, Segoe UI, Arial, sans-serif;
+      font:13px/1.5 "Inter", Arial, sans-serif;
       padding:18px 20px;
       background:#fff;
       box-shadow:0 6px 18px rgba(0,0,0,.25);
+      animation:popupFade .25s ease-out;
       color:#0F2C4C !important;
-      animation: popupFade .25s ease-out;
     }
-    .mapboxgl-popup-close-button, .mapboxgl-popup-tip{ display:none; }
+    .mapboxgl-popup-close-button,.mapboxgl-popup-tip{ display:none; }
     @keyframes popupFade{ from{ transform:translateY(6px); opacity:0 } to{ transform:none; opacity:1 } }
-    .hover-tip .mapboxgl-popup-content{ padding:6px 10px; font-weight:800; border-radius:12px; }
+    .hover-tip .mapboxgl-popup-content{ padding:6px 10px; font-weight:600; border-radius:12px; }
 
-    /* Hide ALL Mapbox UI controls (“menu”) */
+    /* ===== Markers (from your reference) ===== */
+    .marker{
+      background: rgba(226,0,116,.40);
+      border-radius: 50%;
+      box-sizing: content-box;
+      cursor: pointer;
+      transform: translate(-50%, -100%);
+      transition: transform 0.2s ease-out; /* smooth hover scale */
+      border: 2px solid #fff;
+    }
+    .mapboxgl-marker:hover{
+      transform: translate(-50%, -100%) scale(1.3);
+    }
+    .marker.is-hovered{
+      box-shadow:0 0 0 9999px rgba(230,138,167,.35);
+    }
+
+    /* ===== NO UI / NO MENU ===== */
+    /* Hide all Mapbox controls if Mapbox injects any */
     .mapboxgl-ctrl-top-right,
     .mapboxgl-ctrl-top-left,
     .mapboxgl-ctrl-bottom-right,
@@ -68,9 +89,9 @@
       display:none !important;
     }
 
-    /* Optional: hide attribution/logo (may conflict with Mapbox TOS) */
+    /* Optional: hide attribution/logo (Mapbox TOS may require attribution) */
     .mapboxgl-ctrl-attrib { display:none !important; }
-    a.mapboxgl-ctrl-logo { display:none !important; }
+    a.mapboxgl-ctrl-logo  { display:none !important; }
   </style>
 </head>
 
@@ -81,21 +102,21 @@
   </div>
 
   <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+
   <script>
     /*****************************************************************
       CONFIG
     *****************************************************************/
     mapboxgl.accessToken = 'pk.eyJ1IjoianVsaWFuYWRsZXIiLCJhIjoiY21jZXkxcG55MDMwajJ3c2N5MDFvcjFxYSJ9.1CXb3-6uyCagAxGvpWf4iA';
 
-    // Lilly style:
+    // Your desired basemap style
     const STYLE = 'mapbox://styles/lillysturz/cmcdif4wb00ty01sb0z5yf7bk';
 
-    // Your shipments GeoJSON:
+    // Your shipments GeoJSON
     const DATA_URL = 'https://raw.githubusercontent.com/julianadler-ap/aidpioneers-shipments-map/main/combined.geojson';
 
     /*****************************************************************
-      MAP INIT
-      (neutral initial camera; we will fitBounds to all points after load)
+      MAP INIT (globe, no controls)
     *****************************************************************/
     const map = new mapboxgl.Map({
       container: 'map',
@@ -105,12 +126,11 @@
       zoom: 1.1,
       bearing: 0,
       pitch: 0,
-      attributionControl: false
+      attributionControl: false,
+      preserveDrawingBuffer: true
     });
 
-    /*****************************************************************
-      FOG / SPACE TUNING
-    *****************************************************************/
+    // Fog to merge globe into “space”
     map.on('style.load', () => {
       try {
         map.setFog({
@@ -124,15 +144,30 @@
     });
 
     /*****************************************************************
-      HOVER TOOLTIP
+      MARKER SIZING (zoom-based)
+    *****************************************************************/
+    const markers = [];
+
+    function updateMarkerSizes(){
+      const zoom = map.getZoom();
+      // similar feel to your reference scaling
+      const scale = Math.max(0.3, Math.min(2, Math.pow(zoom / 3.5, 2.5)));
+      markers.forEach(m => {
+        const el = m.getElement();
+        const base = 12; // px
+        const size = base * scale;
+        el.style.width = `${size}px`;
+        el.style.height = `${size}px`;
+      });
+    }
+
+    /*****************************************************************
+      Hover tooltip (like your reference)
     *****************************************************************/
     let hoverPopup = null;
-    function attachHoverToLayer(layerId, getHtml) {
-      map.on('mousemove', layerId, (e) => {
-        map.getCanvas().style.cursor = 'pointer';
-        const f = e.features && e.features[0];
-        if (!f) return;
 
+    function addHoverToMarker(el, label, marker){
+      el.addEventListener('mouseenter', () => {
         if (hoverPopup) hoverPopup.remove();
         hoverPopup = new mapboxgl.Popup({
           closeButton: false,
@@ -140,77 +175,83 @@
           className: 'hover-tip',
           offset: 10
         })
-          .setLngLat(e.lngLat)
-          .setHTML(getHtml(f))
+          .setLngLat(marker.getLngLat())
+          .setHTML(label)
           .addTo(map);
       });
 
-      map.on('mouseleave', layerId, () => {
-        map.getCanvas().style.cursor = '';
+      el.addEventListener('mouseleave', () => {
         if (hoverPopup) { hoverPopup.remove(); hoverPopup = null; }
       });
+
+      el.addEventListener('click', () => {
+        if (hoverPopup) { hoverPopup.remove(); hoverPopup = null; }
+      });
+    }
+
+    /*****************************************************************
+      Build routes from POINT rows (same logic as your shipments map)
+    *****************************************************************/
+    function buildLineFeatures(geojson){
+      const routesByContainer = {};
+      for (const f of (geojson.features || [])) {
+        const p = f.properties || {};
+        if (p['Row Type'] !== 'POINT') continue;
+        if (p['API Status'] && p['API Status'] !== 'success') continue;
+
+        const container = p['Container Number'];
+        if (!container) continue;
+
+        (routesByContainer[container] ||= []).push({
+          leg: Number(p['Leg #']),
+          coord: f.geometry?.coordinates
+        });
+      }
+
+      const lineFeatures = [];
+      for (const container of Object.keys(routesByContainer)) {
+        const pts = routesByContainer[container]
+          .filter(x => Array.isArray(x.coord) && x.coord.length === 2)
+          .sort((a, b) => (!isNaN(a.leg) && !isNaN(b.leg)) ? a.leg - b.leg : 0)
+          .map(x => x.coord);
+
+        if (pts.length > 1) {
+          lineFeatures.push({
+            type: 'Feature',
+            geometry: { type: 'LineString', coordinates: pts },
+            properties: { container }
+          });
+        }
+      }
+
+      return { type: 'FeatureCollection', features: lineFeatures };
+    }
+
+    /*****************************************************************
+      Fit to all points (prevents “only Ukraine”)
+    *****************************************************************/
+    function fitToAllPoints(geojson){
+      const bounds = new mapboxgl.LngLatBounds();
+      for (const f of (geojson.features || [])) {
+        if (f.geometry?.type === 'Point' && Array.isArray(f.geometry.coordinates)) {
+          bounds.extend(f.geometry.coordinates);
+        }
+      }
+      if (!bounds.isEmpty()) {
+        map.fitBounds(bounds, { padding: 80, maxZoom: 2.2, duration: 1200 });
+      }
     }
 
     /*****************************************************************
       LOAD + DRAW
     *****************************************************************/
     map.on('load', () => {
-      fetch(`${DATA_URL}?t=${Date.now()}`) // cache-bust GitHub raw
+      fetch(`${DATA_URL}?t=${Date.now()}`)
         .then(r => { if (!r.ok) throw new Error(`GeoJSON fetch failed (${r.status})`); return r.json(); })
         .then(geojson => {
-          map.addSource('shipments', { type: 'geojson', data: geojson });
-
-          // POINTS
-          map.addLayer({
-            id: 'shipment-points',
-            type: 'circle',
-            source: 'shipments',
-            filter: ['==', ['get', 'Row Type'], 'POINT'],
-            paint: {
-              'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, 3, 3, 6, 6, 9],
-              'circle-color': 'rgba(226, 0, 116, 0.70)',
-              'circle-stroke-width': 1.6,
-              'circle-stroke-color': '#ffffff'
-            }
-          });
-
-          // Build LINES per container from points
-          const routesByContainer = {};
-          for (const f of geojson.features || []) {
-            const p = f.properties || {};
-            if (p['Row Type'] !== 'POINT') continue;
-            if (p['API Status'] && p['API Status'] !== 'success') continue;
-
-            const c = p['Container Number'];
-            if (!c) continue;
-
-            (routesByContainer[c] ||= []).push({
-              leg: Number(p['Leg #']),
-              coord: f.geometry?.coordinates
-            });
-          }
-
-          const lineFeatures = [];
-          for (const container of Object.keys(routesByContainer)) {
-            const pts = routesByContainer[container]
-              .filter(x => Array.isArray(x.coord) && x.coord.length === 2)
-              .sort((a, b) => (!isNaN(a.leg) && !isNaN(b.leg)) ? a.leg - b.leg : 0)
-              .map(x => x.coord);
-
-            if (pts.length > 1) {
-              lineFeatures.push({
-                type: 'Feature',
-                geometry: { type: 'LineString', coordinates: pts },
-                properties: { container }
-              });
-            }
-          }
-
-          map.addSource('shipment-lines', {
-            type: 'geojson',
-            data: { type: 'FeatureCollection', features: lineFeatures }
-          });
-
+          // Add lines via Mapbox layer (fast)
+          const lineFC = buildLineFeatures(geojson);
+          map.addSource('shipment-lines', { type: 'geojson', data: lineFC });
           map.addLayer({
             id: 'shipment-lines-layer',
             type: 'line',
@@ -223,49 +264,45 @@
             }
           });
 
-          // Click popup (optional)
-          map.on('click', 'shipment-points', (e) => {
-            const f = e.features && e.features[0];
-            if (!f) return;
+          // Add points as *custom HTML markers* (to match your CSS marker look exactly)
+          const pointFeatures = (geojson.features || []).filter(f => f.properties?.['Row Type'] === 'POINT');
+
+          for (const f of pointFeatures) {
+            const coords = f.geometry?.coordinates;
+            if (!Array.isArray(coords) || coords.length !== 2) continue;
 
             const p = f.properties || {};
-            const html = `
-              <div style="min-width:220px;">
-                <div style="font-weight:800;margin-bottom:6px;">Shipment Point</div>
-                <div><b>Container:</b> ${p['Container Number'] || '-'}</div>
-                <div><b>Leg #:</b> ${p['Leg #'] || '-'}</div>
-                <div><b>Status:</b> ${p['API Status'] || '-'}</div>
+            const label = `Container ${p['Container Number'] || '—'} · Leg ${p['Leg #'] || '—'}`;
+
+            const el = document.createElement('div');
+            el.className = 'marker';
+            el.style.width = el.style.height = '12px';
+
+            const popupHtml = `
+              <div>
+                <strong>Shipment Point</strong><hr class="sep">
+                <b>Container:</b> ${p['Container Number'] || '-'}<br>
+                <b>Leg #:</b> ${p['Leg #'] || '-'}<br>
+                <b>Status:</b> ${p['API Status'] || '-'}
               </div>
             `;
-            new mapboxgl.Popup({ offset: 25 })
-              .setLngLat(e.lngLat)
-              .setHTML(html)
+
+            const marker = new mapboxgl.Marker(el)
+              .setLngLat(coords)
+              .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(popupHtml))
               .addTo(map);
-          });
 
-          // Hover tooltip
-          attachHoverToLayer('shipment-points', (f) => {
-            const p = f.properties || {};
-            return `Container ${p['Container Number'] || '—'} · Leg ${p['Leg #'] || '—'}`;
-          });
-
-          /*****************************************************************
-            ✅ FIT TO ALL POINTS (prevents "only Ukraine" view)
-          *****************************************************************/
-          const bounds = new mapboxgl.LngLatBounds();
-          for (const f of geojson.features || []) {
-            if (f.geometry?.type === "Point" && Array.isArray(f.geometry.coordinates)) {
-              bounds.extend(f.geometry.coordinates);
-            }
+            addHoverToMarker(el, label, marker);
+            markers.push(marker);
           }
 
-          if (!bounds.isEmpty()) {
-            map.fitBounds(bounds, {
-              padding: 80,
-              maxZoom: 2.2,     // keep it global
-              duration: 1200
-            });
-          }
+          // Auto fit to show global network
+          fitToAllPoints(geojson);
+
+          // Initial sizing + resize hooks
+          updateMarkerSizes();
+          map.on('zoom', updateMarkerSizes);
+          window.addEventListener('resize', () => map.resize());
         })
         .catch(console.error);
     });
