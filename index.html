@@ -8,48 +8,36 @@
   <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" />
 
   <style>
-    /* ===== Layout (full bleed, no sidebar) ===== */
+    /* ===== Full-bleed, NO sidebar/menu ===== */
     html, body { height: 100%; margin: 0; }
-    body { overflow: hidden; background: #02060c; }
+    body { overflow: hidden; background: #061325; }
 
-    #mapWrap { position: fixed; inset: 0; }
+    #mapWrap { position: fixed; inset: 0; overflow: hidden; }
 
-    /* “space” outside the globe (matches your styled vibe) */
+    /* Blue “space” gradient behind the globe (no stars) */
     #mapWrap::before{
       content:"";
       position:absolute; inset:0;
       background:
-        radial-gradient(circle at 30% 30%, rgba(120,170,255,0.18) 0%, rgba(0,0,0,0) 40%),
-        radial-gradient(circle at 70% 60%, rgba(255,255,255,0.08) 0%, rgba(0,0,0,0) 45%),
-        radial-gradient(circle at 50% 50%, #0b223b 0%, #05101f 60%, #02060c 100%);
+        radial-gradient(circle at 30% 35%, rgba(120,170,255,0.35) 0%, rgba(0,0,0,0) 45%),
+        radial-gradient(circle at 70% 60%, rgba(255,255,255,0.10) 0%, rgba(0,0,0,0) 55%),
+        radial-gradient(circle at 50% 55%, #163a63 0%, #0b223b 55%, #061325 100%);
       z-index: 0;
-    }
-
-    /* subtle stars */
-    #mapWrap::after{
-      content:"";
-      position:absolute; inset:-20%;
-      background:
-        radial-gradient(circle, rgba(255,255,255,0.35) 1px, transparent 2px) 0 0/120px 120px,
-        radial-gradient(circle, rgba(255,255,255,0.25) 1px, transparent 2px) 40px 60px/180px 180px;
-      opacity: 0.22;
-      pointer-events:none;
-      z-index: 1;
     }
 
     #map { position: absolute; inset: 0; z-index: 2; }
 
-    /* vignette overlay */
+    /* soft vignette like the reference */
     .vignette{
       pointer-events: none;
       position: absolute; inset: 0;
       background:
         radial-gradient(ellipse at 65% 45%, rgba(255,255,255,0.10) 0%, rgba(0,0,0,0.0) 40%),
-        radial-gradient(ellipse at 65% 60%, rgba(0,0,0,0.0) 40%, rgba(0,0,0,0.40) 75%, rgba(0,0,0,0.78) 100%);
+        radial-gradient(ellipse at 65% 60%, rgba(0,0,0,0.0) 40%, rgba(0,0,0,0.35) 75%, rgba(0,0,0,0.65) 100%);
       z-index: 5;
     }
 
-    /* ===== Popups (from your reference) ===== */
+    /* ===== Popups (match Vorlage) ===== */
     .mapboxgl-popup{ z-index:3000!important; border-radius:20px; overflow:hidden; }
     .mapboxgl-popup-content{
       font:13px/1.5 "Inter", Arial, sans-serif;
@@ -63,14 +51,14 @@
     @keyframes popupFade{ from{ transform:translateY(6px); opacity:0 } to{ transform:none; opacity:1 } }
     .hover-tip .mapboxgl-popup-content{ padding:6px 10px; font-weight:600; border-radius:12px; }
 
-    /* ===== Markers (from your reference) ===== */
+    /* ===== Markers (match Vorlage) ===== */
     .marker{
       background: rgba(226,0,116,.40);
       border-radius: 50%;
       box-sizing: content-box;
       cursor: pointer;
       transform: translate(-50%, -100%);
-      transition: transform 0.2s ease-out; /* smooth hover scale */
+      transition: transform 0.2s ease-out;
       border: 2px solid #fff;
     }
     .mapboxgl-marker:hover{
@@ -80,8 +68,7 @@
       box-shadow:0 0 0 9999px rgba(230,138,167,.35);
     }
 
-    /* ===== NO UI / NO MENU ===== */
-    /* Hide all Mapbox controls if Mapbox injects any */
+    /* ===== NO in-map UI/controls ===== */
     .mapboxgl-ctrl-top-right,
     .mapboxgl-ctrl-top-left,
     .mapboxgl-ctrl-bottom-right,
@@ -107,13 +94,15 @@
     /*****************************************************************
       CONFIG
     *****************************************************************/
-    mapboxgl.accessToken = 'pk.eyJ1IjoianVsaWFuYWRsZXIiLCJhIjoiY21jZXkxcG55MDMwajJ3c2N5MDFvcjFxYSJ9.1CXb3-6uyCagAxGvpWf4iA';
+    mapboxgl.accessToken =
+      'pk.eyJ1IjoianVsaWFuYWRsZXIiLCJhIjoiY21jZXkxcG55MDMwajJ3c2N5MDFvcjFxYSJ9.1CXb3-6uyCagAxGvpWf4iA';
 
-    // Your desired basemap style
+    // Lilly basemap style you provided
     const STYLE = 'mapbox://styles/lillysturz/cmcdif4wb00ty01sb0z5yf7bk';
 
     // Your shipments GeoJSON
-    const DATA_URL = 'https://raw.githubusercontent.com/julianadler-ap/aidpioneers-shipments-map/main/combined.geojson';
+    const DATA_URL =
+      'https://raw.githubusercontent.com/julianadler-ap/aidpioneers-shipments-map/main/combined.geojson';
 
     /*****************************************************************
       MAP INIT (globe, no controls)
@@ -130,39 +119,39 @@
       preserveDrawingBuffer: true
     });
 
-    // Fog to merge globe into “space”
+    // Fog “space” set to blue, like Vorlage (no starfield)
     map.on('style.load', () => {
       try {
         map.setFog({
           range: [0.8, 8],
-          color: 'rgba(210, 230, 255, 0.08)',
-          'high-color': 'rgba(150, 190, 255, 0.06)',
-          'space-color': '#02060c',
-          'horizon-blend': 0.10
+          color: 'rgba(210, 230, 255, 0.10)',
+          'high-color': 'rgba(170, 210, 255, 0.10)',
+          'space-color': '#0b223b',
+          'horizon-blend': 0.12
         });
       } catch (_) {}
     });
 
     /*****************************************************************
-      MARKER SIZING (zoom-based)
+      MARKERS (HTML so they match .marker CSS exactly)
     *****************************************************************/
     const markers = [];
 
     function updateMarkerSizes(){
       const zoom = map.getZoom();
-      // similar feel to your reference scaling
       const scale = Math.max(0.3, Math.min(2, Math.pow(zoom / 3.5, 2.5)));
+      const baseSize = 12; // px
+      const size = baseSize * scale;
+
       markers.forEach(m => {
         const el = m.getElement();
-        const base = 12; // px
-        const size = base * scale;
         el.style.width = `${size}px`;
         el.style.height = `${size}px`;
       });
     }
 
     /*****************************************************************
-      Hover tooltip (like your reference)
+      HOVER TOOLTIP
     *****************************************************************/
     let hoverPopup = null;
 
@@ -190,7 +179,7 @@
     }
 
     /*****************************************************************
-      Build routes from POINT rows (same logic as your shipments map)
+      ROUTES (build LineStrings per container)
     *****************************************************************/
     function buildLineFeatures(geojson){
       const routesByContainer = {};
@@ -228,7 +217,7 @@
     }
 
     /*****************************************************************
-      Fit to all points (prevents “only Ukraine”)
+      FIT MAP TO ALL POINTS (so you see global network)
     *****************************************************************/
     function fitToAllPoints(geojson){
       const bounds = new mapboxgl.LngLatBounds();
@@ -249,7 +238,7 @@
       fetch(`${DATA_URL}?t=${Date.now()}`)
         .then(r => { if (!r.ok) throw new Error(`GeoJSON fetch failed (${r.status})`); return r.json(); })
         .then(geojson => {
-          // Add lines via Mapbox layer (fast)
+          // Lines
           const lineFC = buildLineFeatures(geojson);
           map.addSource('shipment-lines', { type: 'geojson', data: lineFC });
           map.addLayer({
@@ -264,8 +253,8 @@
             }
           });
 
-          // Add points as *custom HTML markers* (to match your CSS marker look exactly)
-          const pointFeatures = (geojson.features || []).filter(f => f.properties?.['Row Type'] === 'POINT');
+          // Points (HTML markers for exact styling)
+          const pointFeatures = (geojson.features || []).filter(f => (f.properties?.['Row Type'] === 'POINT'));
 
           for (const f of pointFeatures) {
             const coords = f.geometry?.coordinates;
@@ -296,10 +285,10 @@
             markers.push(marker);
           }
 
-          // Auto fit to show global network
+          // Camera: fit to all points
           fitToAllPoints(geojson);
 
-          // Initial sizing + resize hooks
+          // Responsive sizing
           updateMarkerSizes();
           map.on('zoom', updateMarkerSizes);
           window.addEventListener('resize', () => map.resize());
