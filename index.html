@@ -4,87 +4,38 @@
   <meta charset="utf-8" />
   <title>Aid Pioneers Shipments</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-
   <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&display=swap" rel="stylesheet">
-
   <style>
-    html, body { height:100%; margin:0; }
-    body { font-family: Inter, system-ui, -apple-system, Segoe UI, sans-serif; background:#071b2f; }
+    html, body { height: 100%; margin: 0; background:#050f1c; }
+    #mapWrap { position: relative; height: 100vh; width: 100vw; overflow: hidden; }
+    #map { position: absolute; inset: 0; }
 
-    /* Fullscreen-friendly wrapper */
-    #mapWrap { position:relative; height:100vh; overflow:hidden; }
-    #map { position:absolute; inset:0; }
-
-    /* Globe vignette overlay (big part of the “styled” look) */
+    /* Globe vignette (this is a big part of the “styled” look) */
     .vignette {
-      pointer-events:none;
-      position:absolute; inset:0;
+      pointer-events: none;
+      position: absolute; inset: 0;
       background:
-        radial-gradient(ellipse at 55% 45%, rgba(255,255,255,0.08) 0%, rgba(0,0,0,0.0) 35%),
-        radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0.0) 35%, rgba(0,0,0,0.35) 70%, rgba(0,0,0,0.65) 100%);
-      z-index:5;
+        radial-gradient(ellipse at 65% 45%, rgba(255,255,255,0.10) 0%, rgba(0,0,0,0.0) 40%),
+        radial-gradient(ellipse at 65% 60%, rgba(0,0,0,0.0) 40%, rgba(0,0,0,0.40) 75%, rgba(0,0,0,0.75) 100%);
+      z-index: 5;
     }
 
-    /* Minimal left panel (optional, but matches your styled vibe) */
-    .panel {
-      position:absolute;
-      top:16px; left:16px;
-      width:320px;
-      max-width: calc(100vw - 32px);
-      background: rgba(9, 27, 48, 0.72);
-      border: 1px solid rgba(255,255,255,0.10);
-      backdrop-filter: blur(10px);
-      border-radius: 14px;
-      padding: 14px;
-      color: #fff;
-      z-index: 10;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.30);
-    }
-    .panel h1 { margin:0 0 8px; font-size:14px; font-weight:700; opacity:0.95; }
-    .panel p  { margin:0 0 12px; font-size:12px; line-height:1.35; opacity:0.85; }
-    .pill {
-      display:inline-flex; align-items:center; gap:8px;
-      padding:8px 10px; border-radius:10px;
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.12);
-      font-size:12px; font-weight:600; margin-right:8px;
-    }
-    .dot { width:10px; height:10px; border-radius:999px; background:#E20074; box-shadow:0 0 0 3px rgba(226,0,116,0.22); }
-    .dot.blue { background:#0F2C4C; box-shadow:0 0 0 3px rgba(15,44,76,0.22); }
-
-    /* Deployment proof */
-    .stamp {
-      position:absolute; right:16px; bottom:14px;
-      z-index:10;
-      font-size:11px;
-      color: rgba(255,255,255,0.8);
-      background: rgba(0,0,0,0.35);
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 10px;
-      padding: 6px 10px;
-      backdrop-filter: blur(8px);
-    }
-
-    /* Popups like your styled code */
+    /* Popups (match your styled version) */
     .mapboxgl-popup { z-index:3000!important; border-radius:20px; overflow:hidden; }
     .mapboxgl-popup-content{
-      font:13px/1.5 "Inter", Arial, sans-serif;
+      font:13px/1.5 system-ui, -apple-system, Segoe UI, Arial, sans-serif;
       padding:18px 20px;
       background:#fff;
       box-shadow:0 6px 18px rgba(0,0,0,.25);
-      animation:popupFade .25s ease-out;
       color:#0F2C4C !important;
+      animation: popupFade .25s ease-out;
     }
     .mapboxgl-popup-close-button, .mapboxgl-popup-tip { display:none; }
     @keyframes popupFade { from{ transform:translateY(6px); opacity:0 } to{ transform:none; opacity:1 } }
     .hover-tip .mapboxgl-popup-content { padding:6px 10px; font-weight:800; border-radius:12px; }
 
-    :fullscreen header, :fullscreen nav, :fullscreen .site-header{ display:none!important; }
-
-    @media (max-width: 700px) { .panel { width: 280px; } }
+    /* Safety: avoid accidental page scrolling */
+    body { overflow: hidden; }
   </style>
 </head>
 
@@ -92,59 +43,36 @@
   <div id="mapWrap">
     <div id="map"></div>
     <div class="vignette"></div>
-
-    <div class="panel">
-      <h1>Aid Pioneers · Shipments Map</h1>
-      <p>Hover for quick info, click for details. Styled with Lilly’s Mapbox theme.</p>
-      <div>
-        <span class="pill"><span class="dot"></span> Points</span>
-        <span class="pill"><span class="dot blue"></span> Routes</span>
-      </div>
-    </div>
-
-    <div class="stamp" id="buildStamp">Build: —</div>
   </div>
 
   <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
   <script>
-    /*****************************************************************
-      CONFIG
-    *****************************************************************/
     mapboxgl.accessToken = 'pk.eyJ1IjoianVsaWFuYWRsZXIiLCJhIjoiY21jZXkxcG55MDMwajJ3c2N5MDFvcjFxYSJ9.1CXb3-6uyCagAxGvpWf4iA';
 
-    // ✅ Your styled Mapbox theme:
-    const BASE_STYLE = 'mapbox://styles/lillysturz/cmcdif4wb00ty01sb0z5yf7bk';
+    const STYLE = 'mapbox://styles/lillysturz/cmcdif4wb00ty01sb0z5yf7bk';
 
     const DATA_URL =
       'https://raw.githubusercontent.com/julianadler-ap/aidpioneers-shipments-map/main/combined.geojson';
 
-    /*****************************************************************
-      BUILD STAMP (deployment proof)
-    *****************************************************************/
-    const BUILD_ID = new Date().toISOString();
-    document.getElementById('buildStamp').textContent = `Build: ${BUILD_ID}`;
-    console.log('[AidPioneers Shipments] Build:', BUILD_ID);
-
-    /*****************************************************************
-      MAP INIT
-    *****************************************************************/
     const map = new mapboxgl.Map({
       container: 'map',
-      style: BASE_STYLE,
-      center: [10, 20],
-      zoom: 2,
-      projection: 'globe'
+      style: STYLE,
+      projection: 'globe',
+
+      // Key to "big cropped globe" look:
+      // Africa / MENA in view, globe filling most of frame.
+      center: [25, 20],
+      zoom: 1.85,
+      bearing: -12,
+      pitch: 0
     });
 
-    map.addControl(new mapboxgl.FullscreenControl({ container: document.getElementById('mapWrap') }), 'top-right');
     map.addControl(new mapboxgl.NavigationControl({ showCompass: true }), 'top-right');
+    map.addControl(new mapboxgl.FullscreenControl({ container: document.getElementById('mapWrap') }), 'top-right');
     map.addControl(new mapboxgl.ScaleControl({ maxWidth: 140, unit: 'metric' }), 'bottom-right');
 
-    /*****************************************************************
-      HOVER TOOLTIP
-    *****************************************************************/
+    // Hover tooltip
     let hoverPopup = null;
-
     function attachHoverToLayer(layerId, getHtml) {
       map.on('mousemove', layerId, (e) => {
         map.getCanvas().style.cursor = 'pointer';
@@ -169,11 +97,8 @@
       });
     }
 
-    /*****************************************************************
-      STYLE LOAD: add atmosphere if desired
-    *****************************************************************/
     map.on('style.load', () => {
-      // If Lilly’s style already defines fog/atmosphere, this is harmless.
+      // Adds the “atmosphere” vibe (if the style already has fog, this is harmless)
       try {
         map.setFog({
           range: [0.8, 8],
@@ -182,60 +107,46 @@
           'space-color': 'rgba(3, 10, 20, 1)',
           'horizon-blend': 0.12
         });
-      } catch (e) {
-        console.log('Fog not applied:', e);
-      }
+      } catch (_) {}
     });
 
-    /*****************************************************************
-      LOAD + DRAW
-    *****************************************************************/
     map.on('load', () => {
-      fetch(`${DATA_URL}?t=${Date.now()}`) // cache-bust RAW github
-        .then(resp => {
-          if (!resp.ok) throw new Error(`GeoJSON fetch failed (${resp.status})`);
-          return resp.json();
-        })
+      fetch(`${DATA_URL}?t=${Date.now()}`)
+        .then(r => { if (!r.ok) throw new Error(`GeoJSON fetch failed (${r.status})`); return r.json(); })
         .then(geojson => {
           map.addSource('shipments', { type: 'geojson', data: geojson });
 
-          // Pink points
+          // POINTS
           map.addLayer({
             id: 'shipment-points',
             type: 'circle',
             source: 'shipments',
             filter: ['==', ['get', 'Row Type'], 'POINT'],
             paint: {
-              'circle-radius': ['interpolate', ['linear'], ['zoom'], 2, 3, 6, 5, 10, 8],
-              'circle-color': 'rgba(226, 0, 116, 0.65)',
-              'circle-stroke-width': 1.5,
+              'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, 3, 3, 6, 6, 9],
+              'circle-color': 'rgba(226, 0, 116, 0.70)',
+              'circle-stroke-width': 1.6,
               'circle-stroke-color': '#ffffff'
             }
           });
 
-          // Build lines per container from points
+          // LINES per Container Number from points
           const routesByContainer = {};
-          geojson.features.forEach(f => {
-            const props = f.properties || {};
-            if (props['Row Type'] !== 'POINT') return;
-            if (props['API Status'] && props['API Status'] !== 'success') return;
-
-            const container = props['Container Number'];
-            if (!container) return;
-
-            if (!routesByContainer[container]) routesByContainer[container] = [];
-            routesByContainer[container].push({
-              leg: Number(props['Leg #']),
-              coord: f.geometry?.coordinates
-            });
-          });
+          for (const f of geojson.features || []) {
+            const p = f.properties || {};
+            if (p['Row Type'] !== 'POINT') continue;
+            if (p['API Status'] && p['API Status'] !== 'success') continue;
+            const c = p['Container Number'];
+            if (!c) continue;
+            (routesByContainer[c] ||= []).push({ leg: Number(p['Leg #']), coord: f.geometry?.coordinates });
+          }
 
           const lineFeatures = [];
-          Object.keys(routesByContainer).forEach(container => {
+          for (const container of Object.keys(routesByContainer)) {
             const pts = routesByContainer[container]
-              .filter(p => Array.isArray(p.coord) && p.coord.length === 2)
+              .filter(x => Array.isArray(x.coord) && x.coord.length === 2)
               .sort((a, b) => (!isNaN(a.leg) && !isNaN(b.leg)) ? a.leg - b.leg : 0)
-              .map(p => p.coord);
+              .map(x => x.coord);
 
             if (pts.length > 1) {
               lineFeatures.push({
@@ -244,7 +155,7 @@
                 properties: { container }
               });
             }
-          });
+          }
 
           map.addSource('shipment-lines', {
             type: 'geojson',
@@ -258,8 +169,8 @@
             layout: { 'line-join': 'round', 'line-cap': 'round' },
             paint: {
               'line-color': '#0F2C4C',
-              'line-width': ['interpolate', ['linear'], ['zoom'], 2, 1.25, 4, 2, 6, 3, 8, 4],
-              'line-opacity': 0.65
+              'line-width': ['interpolate', ['linear'], ['zoom'], 1, 1.2, 3, 2.2, 6, 3.6],
+              'line-opacity': 0.70
             }
           });
 
@@ -267,7 +178,6 @@
           map.on('click', 'shipment-points', (e) => {
             const f = e.features && e.features[0];
             if (!f) return;
-
             const p = f.properties || {};
             const html = `
               <div style="min-width:220px;">
@@ -277,31 +187,16 @@
                 <div><b>Status:</b> ${p['API Status'] || '-'}</div>
               </div>
             `;
-
-            new mapboxgl.Popup({ offset: 25 })
-              .setLngLat(e.lngLat)
-              .setHTML(html)
-              .addTo(map);
+            new mapboxgl.Popup({ offset: 25 }).setLngLat(e.lngLat).setHTML(html).addTo(map);
           });
 
           // Hover tooltip
           attachHoverToLayer('shipment-points', (f) => {
             const p = f.properties || {};
-            const container = p['Container Number'] || '—';
-            const leg = p['Leg #'] || '—';
-            return `Container ${container} · Leg ${leg}`;
+            return `Container ${p['Container Number'] || '—'} · Leg ${p['Leg #'] || '—'}`;
           });
-
-          // Fit bounds to all points
-          const bounds = new mapboxgl.LngLatBounds();
-          geojson.features.forEach(f => {
-            if (f.geometry?.type === 'Point' && Array.isArray(f.geometry.coordinates)) {
-              bounds.extend(f.geometry.coordinates);
-            }
-          });
-          if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 60, maxZoom: 6 });
         })
-        .catch(err => console.error('Error:', err));
+        .catch(console.error);
     });
   </script>
 </body>
